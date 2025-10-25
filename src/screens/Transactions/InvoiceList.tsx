@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
@@ -16,6 +16,7 @@ import { invoiceRepo } from '../../db/repo';
 import { calculations } from '../../utils/calculations';
 
 const InvoiceList: React.FC = () => {
+  const navigation = useNavigation();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -34,11 +35,12 @@ const InvoiceList: React.FC = () => {
 
   const loadInvoices = async () => {
     try {
+      
       // Ensure database is properly initialized
       await database.init();
       
       // Add a small delay to ensure database is ready
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
       
       let allInvoices = await invoiceRepo.findAll();
 
@@ -51,7 +53,10 @@ const InvoiceList: React.FC = () => {
       
       // Only show alert if this is not a background refresh
       if (loading) {
-        Alert.alert('Error', 'Failed to load invoices. Please try again.');
+        Alert.alert(
+          'Error', 
+          `Failed to load invoices: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`
+        );
       }
     } finally {
       setLoading(false);
@@ -64,6 +69,12 @@ const InvoiceList: React.FC = () => {
     setRefreshing(false);
   };
 
+  const handleEditInvoice = (invoice: Invoice) => {
+    (navigation as any).navigate('CreateInvoice', { 
+      editMode: true, 
+      invoiceId: invoice.id 
+    });
+  };
 
   const handleDeleteInvoice = (invoice: Invoice) => {
     Alert.alert(
@@ -80,7 +91,11 @@ const InvoiceList: React.FC = () => {
               await loadInvoices();
               Alert.alert('Success', 'Invoice deleted successfully');
             } catch (error) {
-              Alert.alert('Error', 'Failed to delete invoice');
+              console.error('Error deleting invoice:', error);
+              Alert.alert(
+                'Error', 
+                `Failed to delete invoice: ${error instanceof Error ? error.message : 'Unknown error'}`
+              );
             }
           },
         },
@@ -103,7 +118,12 @@ const InvoiceList: React.FC = () => {
           </Text>
         </View>
         <View style={styles.invoiceActions}>
-          
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => handleEditInvoice(item)}
+          >
+            <Ionicons name="pencil-outline" size={16} color="#007AFF" />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.deleteButton}
             onPress={() => handleDeleteInvoice(item)}
@@ -229,6 +249,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  editButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#f0f8ff',
+    marginRight: 8,
   },
   deleteButton: {
     padding: 8,

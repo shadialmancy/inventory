@@ -1,21 +1,69 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import React, { useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { database } from '../db/database';
+import { customerRepo, invoiceRepo, itemRepo } from '../db/repo';
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation();
-  const [stats] = useState({
+  const [stats, setStats] = useState({
     totalItems: 0,
     totalInvoices: 0,
     totalCustomers: 0,
   });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadStats = async () => {
+    try {
+      await database.init();
+      
+      const [items, invoices, customers] = await Promise.all([
+        itemRepo.findAll(),
+        invoiceRepo.findAll(),
+        customerRepo.findAll()
+      ]);
+
+      setStats({
+        totalItems: items?.length || 0,
+        totalInvoices: invoices?.length || 0,
+        totalCustomers: customers?.length || 0,
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
+      setStats({
+        totalItems: 0,
+        totalInvoices: 0,
+        totalCustomers: 0,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadStats();
+    }, [])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadStats();
+    setRefreshing(false);
+  };
 
   const MenuCard = ({ 
     title, 
@@ -58,13 +106,20 @@ const HomeScreen: React.FC = () => {
           <Ionicons name={icon} size={24} color={color} />
           <Text style={styles.statTitle}>{title}</Text>
         </View>
-        <Text style={[styles.statValue, { color }]}>{value}</Text>
+        <Text style={[styles.statValue, { color }]}>
+          {loading ? '...' : value}
+        </Text>
       </View>
     </View>
   );
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Dashboard</Text>
         <Text style={styles.subtitle}>Inventory Management System</Text>

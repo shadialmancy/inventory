@@ -24,6 +24,8 @@ interface CreateInvoiceProps {
   route?: {
     params?: {
       customerId?: number;
+      editMode?: boolean;
+      invoiceId?: number;
     };
   };
 }
@@ -31,6 +33,8 @@ interface CreateInvoiceProps {
 const CreateInvoice: React.FC<CreateInvoiceProps> = ({ route }) => {
   const navigation = useNavigation();
   const customerId = route?.params?.customerId;
+  const editMode = route?.params?.editMode || false;
+  const invoiceId = route?.params?.invoiceId;
 
   const [formData, setFormData] = useState({
     customerId: customerId?.toString() || '',
@@ -54,8 +58,12 @@ const CreateInvoice: React.FC<CreateInvoiceProps> = ({ route }) => {
 
   useEffect(() => {
     loadData();
-    generateInvoiceNumber();
-  }, []);
+    if (editMode && invoiceId) {
+      loadInvoiceData();
+    } else {
+      generateInvoiceNumber();
+    }
+  }, [editMode, invoiceId]);
 
   const loadData = async () => {
     try {
@@ -73,6 +81,43 @@ const CreateInvoice: React.FC<CreateInvoiceProps> = ({ route }) => {
     } catch (error) {
       console.error('Error loading data:', error);
       Alert.alert('Error', 'Failed to load data');
+    }
+  };
+
+  const loadInvoiceData = async () => {
+    try {
+      await database.init();
+      const invoiceData = await invoiceRepo.getInvoiceWithItems(invoiceId!);
+      
+      if (invoiceData) {
+        const { invoice, items } = invoiceData;
+        
+        // Set form data
+        setFormData({
+          customerId: invoice.customerId.toString(),
+          invoiceNumber: invoice.invoiceNumber,
+          date: invoice.date,
+          taxRate: invoice.taxRate.toString(),
+          notes: invoice.notes || '',
+        });
+        
+        // Set selected items
+        const itemsWithDetails = await Promise.all(
+          items.map(async (item) => {
+            const itemDetails = await itemRepo.findById(item.itemId);
+            return {
+              ...itemDetails!,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              extendedAmount: item.totalPrice,
+            };
+          })
+        );
+        setSelectedItems(itemsWithDetails);
+      }
+    } catch (error) {
+      console.error('Error loading invoice data:', error);
+      Alert.alert('Error', 'Failed to load invoice data');
     }
   };
 
@@ -174,7 +219,7 @@ const CreateInvoice: React.FC<CreateInvoiceProps> = ({ route }) => {
 
       const { subtotal, tax, total } = calculateTotals();
 
-      // Create invoice
+      // Prepare invoice data
       const invoiceData = {
         customerId: parseInt(formData.customerId),
         invoiceNumber: formData.invoiceNumber,
@@ -187,12 +232,26 @@ const CreateInvoice: React.FC<CreateInvoiceProps> = ({ route }) => {
         notes: formData.notes.trim() || undefined,
       };
 
-      const invoiceId = await invoiceRepo.create(invoiceData);
+      let currentInvoiceId = invoiceId;
 
-      // Create invoice items
+      if (editMode && invoiceId) {
+        // Update existing invoice
+        await invoiceRepo.update(invoiceId, invoiceData);
+        
+        // Delete existing invoice items
+        const existingItems = await invoiceItemRepo.findByInvoice(invoiceId);
+        for (const item of existingItems) {
+          await invoiceItemRepo.delete(item.id);
+        }
+      } else {
+        // Create new invoice
+        currentInvoiceId = await invoiceRepo.create(invoiceData);
+      }
+
+      // Create/update invoice items
       for (const item of selectedItems) {
         await invoiceItemRepo.create({
-          invoiceId,
+          invoiceId: currentInvoiceId,
           itemId: item.id,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
@@ -200,20 +259,24 @@ const CreateInvoice: React.FC<CreateInvoiceProps> = ({ route }) => {
         });
       }
 
-      Alert.alert('Success', 'Invoice created successfully', [
+      const successMessage = editMode ? 'Invoice updated successfully' : 'Invoice created successfully';
+      Alert.alert('Success', successMessage, [
         { text: 'OK', onPress: () => (navigation as any).goBack() }
       ]);
-      // Reset form
-      setSelectedItems([]);
-      setFormData(prev => ({
-        ...prev,
-        customerId: '',
-        notes: '',
-      }));
-      generateInvoiceNumber();
+      
+      // Reset form only if creating new invoice
+      if (!editMode) {
+        setSelectedItems([]);
+        setFormData(prev => ({
+          ...prev,
+          customerId: '',
+          notes: '',
+        }));
+        generateInvoiceNumber();
+      }
     } catch (error) {
-      console.error('Error creating invoice:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create invoice';
+      console.error('Error saving invoice:', error);
+      const errorMessage = error instanceof Error ? error.message : `Failed to ${editMode ? 'update' : 'create'} invoice`;
       Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
@@ -228,7 +291,7 @@ const CreateInvoice: React.FC<CreateInvoiceProps> = ({ route }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Create Invoice</Text>
+        <Text style={styles.title}>{editMode ? 'Edit Invoice' : 'Create Invoice'}</Text>
 
         <View style={styles.form}>
           {/* Customer Selection */}
@@ -407,7 +470,7 @@ const CreateInvoice: React.FC<CreateInvoiceProps> = ({ route }) => {
           </View>
 
           <Button
-            title="Create Invoice"
+            title={editMode ? 'Update Invoice' : 'Create Invoice'}
             onPress={handleSaveInvoice}
             loading={loading}
             style={styles.saveButton}

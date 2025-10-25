@@ -135,7 +135,7 @@ export class InvoiceRepository extends Repository<Invoice> {
   async findByCustomer(customerId: number): Promise<Invoice[]> {
     const db = await database.ensureDatabase();
     return await db.getAllAsync<Invoice>(
-      'SELECT * FROM invoices WHERE customer_id = ? ORDER BY date DESC',
+      'SELECT * FROM invoices WHERE customerId = ? ORDER BY date DESC',
       [customerId]
     );
   }
@@ -168,7 +168,7 @@ export class InvoiceRepository extends Repository<Invoice> {
     if (!invoice) return null;
 
     const items = await db.getAllAsync<InvoiceItem>(
-      'SELECT * FROM invoice_items WHERE invoice_id = ?',
+      'SELECT * FROM invoice_items WHERE invoiceId = ?',
       [invoiceId]
     );
 
@@ -184,7 +184,7 @@ export class InvoiceItemRepository extends Repository<InvoiceItem> {
   async findByInvoice(invoiceId: number): Promise<InvoiceItem[]> {
     const db = await database.ensureDatabase();
     return await db.getAllAsync<InvoiceItem>(
-      'SELECT * FROM invoice_items WHERE invoice_id = ?',
+      'SELECT * FROM invoice_items WHERE invoiceId = ?',
       [invoiceId]
     );
   }
@@ -213,7 +213,7 @@ export class TransactionRepository extends Repository<Transaction> {
   async findByItem(itemId: number): Promise<Transaction[]> {
     const db = await database.ensureDatabase();
     return await db.getAllAsync<Transaction>(
-      'SELECT * FROM transactions WHERE item_id = ? ORDER BY created_at DESC',
+      'SELECT * FROM transactions WHERE itemId = ? ORDER BY createdAt DESC',
       [itemId]
     );
   }
@@ -221,7 +221,7 @@ export class TransactionRepository extends Repository<Transaction> {
   async findByType(type: string): Promise<Transaction[]> {
     const db = await database.ensureDatabase();
     return await db.getAllAsync<Transaction>(
-      'SELECT * FROM transactions WHERE type = ? ORDER BY created_at DESC',
+      'SELECT * FROM transactions WHERE type = ? ORDER BY createdAt DESC',
       [type]
     );
   }
@@ -229,7 +229,7 @@ export class TransactionRepository extends Repository<Transaction> {
   async getItemHistory(itemId: number, limit: number = 50): Promise<Transaction[]> {
     const db = await database.ensureDatabase();
     return await db.getAllAsync<Transaction>(
-      'SELECT * FROM transactions WHERE item_id = ? ORDER BY created_at DESC LIMIT ?',
+      'SELECT * FROM transactions WHERE itemId = ? ORDER BY createdAt DESC LIMIT ?',
       [itemId, limit]
     );
   }

@@ -8,14 +8,17 @@ class DatabaseManager {
 
   async init(): Promise<void> {
     try {
+      // Close existing connection if it exists
       if (this.db) {
         try {
           await this.db.closeAsync();
         } catch (closeError) {
-          console.log('Error closing existing database connection:', closeError);
         }
         this.db = null;
       }
+
+      // Wait a bit before opening new connection
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       this.db = await SQLite.openDatabaseAsync(DATABASE_NAME);
       
@@ -23,16 +26,15 @@ class DatabaseManager {
         throw new Error('Failed to create database connection');
       }
       
+      // Test the connection
       try {
         await this.db.getFirstAsync('SELECT 1 as test');
-        console.log('Database connection test successful');
       } catch (testError) {
         console.error('Database connection test failed:', testError);
-        console.log('Continuing with database initialization despite test failure');
+        // Don't throw here, continue with table creation
       }
       
       await this.createTables();
-      console.log('Database initialized successfully');
     } catch (error) {
       console.error('Error initializing database:', error);
       this.db = null;
@@ -214,7 +216,6 @@ class DatabaseManager {
     
     try {
       await this.db!.getFirstAsync('SELECT 1 as test');
-      console.log('Database connection verified');
     } catch (error) {
       console.error('Database connection test failed, but continuing...', error);
     }

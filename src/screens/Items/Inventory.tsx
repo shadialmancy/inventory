@@ -205,12 +205,7 @@ const Inventory: React.FC = () => {
           <Text style={[styles.statValue, { color: '#dc3545' }]}>{displayStats.outOfStockCount}</Text>
           <Text style={styles.statLabel}>Out of Stock</Text>
         </View>
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: '#28a745' }]}>
-            {calculations.formatCurrency(displayStats.totalValue)}
-          </Text>
-          <Text style={styles.statLabel}>Total Value</Text>
-        </View>
+       
       </View>
 
       {/* Filter Buttons */}
